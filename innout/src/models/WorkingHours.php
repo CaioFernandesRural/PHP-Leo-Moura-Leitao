@@ -14,16 +14,16 @@ class WorkingHours extends Model {
     ];
 
     public static function loadFromUserAndDate($userId, $workDate) {
-        $registry = self::getOne(['user_id' => $userId, 'work_date' => $workDate]);
+        $registries = self::getOne(['user_id' => $userId, 'work_date' => $workDate]);
         
-        if (!$registry) {
-            $registry = new WorkingHours([
+        if (!$registries) {
+            $registries = new WorkingHours([
                 'user_id' => $userId,
                 'work_date' => $workDate,
                 'worked_time' => 0
             ]);
         }
-        return $registry;
+        return $registries;
     }
 
     public function getNextTime(){
@@ -51,6 +51,7 @@ class WorkingHours extends Model {
             throw new AppException("Você já fez os 4 batimentos.");
         }
         $this->$timeColumn = $time;
+        $this->worked_time = getSecondsFromDateInterval($this->getWorkedInterval());
         if($this->id){
             $this->update();
         } else {
@@ -94,6 +95,35 @@ class WorkingHours extends Model {
             $total = sumIntervals($workday, $this->getLunchInterval());
             return $t1->add($total);
         }
+    }
+
+    function getBalance(){
+        if(!$this->time1 && !isPastWorkday($this->work_date)) return '';
+        if($this->worked_time == DAILY_TIME) return '-'; 
+
+        $balance = $this->worked_time - DAILY_TIME;
+        $balanceString = getTimeStringFromSeconds(abs($balance));
+        $sign = $this->worked_time >= DAILY_TIME ? '+' : '-';
+        return "{$sign}{$balanceString}";
+    }
+
+    public static function getMonthlyReport($userId, $date){
+        $registries = [];
+        $startDate = getFirstDayOfMonth($date)->format('Y-m-d');
+        $endDate = getLastDayOfMonth($date)->format('Y-m-d');
+        
+        $result = static::getResultSetFromSelect([
+            'user_id' => $userId,
+            'raw' => "work_date between '{$startDate}' AND '{$endDate}'"
+        ]);
+
+        if($result){
+            while($row = $result->fetch_assoc()){
+                $registries[$row['work_date']] = new WorkingHours($row);
+            }
+        }
+
+        return $registries;
     }
 
     private function getTimes(){
