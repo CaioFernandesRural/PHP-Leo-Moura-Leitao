@@ -2,6 +2,8 @@
 
 class ValidationException extends AppException{
 
+    private $errors = [];
+
     public function __construct($errors = [],
         $message = 'Erros de validação',
         $code = 0,
